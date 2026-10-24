@@ -103,6 +103,10 @@ h2:after{content:"";flex:1;height:4px;border-radius:9px;background:linear-gradie
 .foot{margin-top:26px;font-size:12px;color:var(--sub);text-align:center}
 .link{background:none;color:var(--sub);text-decoration:underline;font-size:12px;padding:6px}
 @media (max-width:420px){.modes{grid-template-columns:1fr}}
+.term{border-bottom:2px dotted currentColor;color:inherit;font-weight:800;cursor:pointer}
+#tip{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);width:min(92vw,560px);background:var(--card);color:var(--ink);border:3px solid var(--acc);border-radius:16px;padding:12px 14px;box-shadow:var(--shadow);z-index:60;font-size:15px;line-height:1.7}
+#tip small{display:block;color:var(--sub);margin-top:6px}
+.chap .row .btn.sm{white-space:nowrap;padding:8px 6px;font-size:13px}
 </style>
 </head>
 <body>
@@ -168,14 +172,33 @@ function home(){
  CHS.forEach(c=>{const s=chapStat(c.key),p=Math.round(s.m*100/s.n);
   h+=`<div class="chap"><div class="top"><span class="ic">${c.icon}</span><div class="tt"><b>${c.label}　${c.title}</b><small>${s.n}問 ／ 習得 ${s.m}${p===100?' 🏅コンプリート！':''}</small></div></div>
   <div class="bar"><i style="width:${p}%"></i></div>
-  <div class="row"><button class="btn sm" data-c="${c.key}" data-u="0">最初から</button><button class="btn sm alt" data-c="${c.key}" data-u="1" ${s.m===s.n?'disabled':''}>未習得だけ</button></div></div>`});
- h+=`</div><div class="foot"><button class="link" id="snd">🔈 効果音：${sound?'ON':'OFF'}</button> <button class="link" id="rst">進捗をリセット</button><br>教材：非破壊検査による配筋探査（問題と解説）より作成</div>`;
+  <div class="row"><button class="btn sm" data-c="${c.key}" data-u="0">最初から</button><button class="btn sm alt" data-c="${c.key}" data-u="1" ${s.m===s.n?'disabled':''}>未習得だけ</button><button class="btn sm alt" data-c="${c.key}" data-u="2">📋 全問</button></div></div>`});
+h+=`</div><div class="foot"><button class="link" id="snd">🔈 効果音：${sound?'ON':'OFF'}</button> <button class="link" id="rst">進捗をリセット</button><br>教材：非破壊検査による配筋探査（問題と解説）より作成</div>`;
  app.innerHTML=h;
  app.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>startMode(b.dataset.m));
- app.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{const k=b.dataset.c;let ids=QS.filter(q=>q.ch===k).map(q=>q.id);if(b.dataset.u==='1')ids=ids.filter(i=>!mastered(i));start({name:CHS.find(c=>c.key===k).title,ids})});
- $('#snd').onclick=()=>{sound=!sound;beep(660,.1);home()};
+ app.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{const k=b.dataset.c;let ids=QS.filter(q=>q.ch===k).map(q=>q.id);if(b.dataset.u==='1')ids=ids.filter(i=>!mastered(i));if(b.dataset.u==='2'){listAll(k);return}start({name:CHS.find(c=>c.key===k).title,ids})});
+  $('#snd').onclick=()=>{sound=!sound;beep(660,.1);home()};
  $('#rst').onclick=()=>{if(confirm('学習の記録をすべて消します。よろしいですか？')){S={xp:0,best:0,days:0,last:'',ans:{},tot:0,ok:0};save();home()}};
  window.scrollTo(0,0);
+}
+function listAll(k){
+ const c=CHS.find(x=>x.key===k),qs=QS.filter(q=>q.ch===k);
+ const tg={wrong:'❌ 誤っているものを選べ',right:'⭕ 正しいものを選べ',other:'🎯 当てはまるものを選べ'};
+ let h=`<div class="top-bar"><button class="btn sm alt" id="back">← もどる</button><div class="grow"><b>${c.label}　${c.title}</b></div><small>全${qs.length}問</small></div>`;
+ qs.forEach((q,qi)=>{h+=`<div class="qcard" data-qi="${qi}" style="margin-bottom:14px"><div class="meta"><span class="tg ${q.type}">${tg[q.type]}</span><span>${c.label} 問${q.n}</span></div>
+  <div class="stem">${q.stem}</div>${q.extra||''}
+  <div class="choices">${q.choices.map((t,i)=>`<button class="ch" data-i="${i}"><span class="no">${NUM[i]}</span><span>${t}</span></button>`).join('')}</div><div class="after"></div></div>`});
+ h+=`<button class="btn alt" id="back2">🏠 ホームへ</button>`;
+ app.innerHTML=h;window.scrollTo(0,0);
+ $('#back').onclick=$('#back2').onclick=()=>home();
+ app.querySelectorAll('.qcard[data-qi]').forEach(card=>{
+  const q=qs[+card.dataset.qi];
+  card.querySelectorAll('.ch').forEach(b=>b.onclick=()=>{
+   const i=+b.dataset.i,ok=(i===q.ans);
+   card.querySelectorAll('.ch').forEach((x,j)=>{x.disabled=true;if(j===q.ans)x.classList.add('ok');else if(j===i)x.classList.add('ng');else x.classList.add('dim')});
+   card.querySelector('.after').innerHTML=`<div class="fb ${ok?'ok':'ng'}">${ok?'⭕ 正解':'❌ 不正解'}（正解は ${NUM[q.ans]}）</div><div class="exp"><div class="ref">📖 テキスト ${q.page||'（頁の記載なし）'}</div>${q.own?'<span class="own">教材に解説なし・補足</span><br>':''}${q.exp}</div>`;
+  });
+ });
 }
 function startMode(m){
  const all=QS.map(q=>q.id);
@@ -242,6 +265,53 @@ function result(){
 document.addEventListener('keydown',e=>{if(!Q||!document.querySelector('.ch'))return;
  if(/^[1-4]$/.test(e.key)){const b=document.querySelectorAll('.ch')[+e.key-1];if(b&&!b.disabled)b.click()}
  if(e.key==='Enter'){const n=$('#next');if(n)n.click()}});
+const GLOSS={
+ '比強度':'<b>比強度</b>＝強度 ÷ 重さ（密度）。<br>「軽さのわりに、どれだけ強いか」の指標です。<br>コンクリートは重いので比強度が<b>小さい</b>。地震の力は建物の重さに比例するため、耐震では不利になります。だから設計の工夫（鉄筋の配置など）が必要、というのがこの問題の答えです。',
+ 'コールドジョイント':'<b>コールドジョイント</b><br>先に打ったコンクリートが固まり始めてから次を打ち重ねたため、一体にならずにできる継ぎ目です。弱点になり、水の通り道や鉄筋の腐食の原因になります。打重ね時間間隔が長すぎると起こります。',
+ 'ブリーディング':'<b>ブリーディング</b><br>打込み後、重い材料（セメント・骨材）が沈み、水だけが表面に浮き上がってくる現象です。表面がもろくなったり、鉄筋の下側に水の隙間ができて付着が落ちたりします。',
+ 'アルカリシリカ反応':'<b>アルカリシリカ反応（ASR）</b><br>セメントのアルカリと、骨材の中の反応性シリカが反応し、水を吸って膨らむゲルができます。その膨張でコンクリートが内部から割れる現象で、亀甲状のひび割れが特徴です。',
+ 'エフロレッセンス':'<b>エフロレッセンス（白華）</b><br>ひび割れなどから染み出した水にコンクリート中のカルシウム分が溶け、表面で空気中の二酸化炭素と反応して白く固まったものです。',
+ 'ポップアウト':'<b>ポップアウト</b><br>コンクリート表面近くの骨材などが膨張し、表面が円錐状（お椀状）に飛び出してはがれる現象です。原因は反応性骨材や凍結融解などです。',
+ 'クリープ':'<b>クリープ</b><br>一定の力をかけ続けると、時間がたつにつれて変形（ひずみ）が少しずつ増えていく現象です。力を増やしていないのに進むのがポイントです。',
+ 'フレッシュコンクリート':'<b>フレッシュコンクリート</b><br>練り混ぜた直後から固まり始める前までの、まだやわらかい状態のコンクリートです。固まった後は「硬化コンクリート」と呼びます。',
+ 'ワーカビリティー':'<b>ワーカビリティー</b><br>運搬・打込み・締固め・仕上げのしやすさです。材料が分離せず、均一に施工できる度合いを表します。',
+ '比誘電率':'<b>比誘電率</b><br>電磁波の伝わり方に関わる材料の性質で、真空を1とした比です。電磁波の速度 ＝ 光速 ÷ √比誘電率 なので、値が大きいほど電磁波は遅くなります。目安は、空気が1、コンクリートが約6〜10、水が約80です。レーダ法では、比誘電率が違う境目で電磁波が反射します。',
+ '直接反射波形':'<b>直接反射波形（Aモード）</b><br>ある1地点で受信した反射波を、横軸＝時間（深さ）、縦軸＝振幅で表した波形です。その最初の山（ピーク）の向き＝極性を見ることで、反射した物の性質がわかります。',
+ '極性':'<b>極性</b><br>反射波の山・谷の向き（プラスかマイナスか）のことです。コンクリートより比誘電率が<b>小さい</b>物（空洞）で反射するとプラス、<b>大きい</b>物（鉄筋）で反射するとマイナスになります。そのため、最初のピークの極性から比誘電率の大小関係がわかります（材質や大きさまではわかりません）。',
+ 'NDIS':'<b>NDIS</b><br>日本非破壊検査協会が定める規格（日本非破壊検査協会規格）の略称です。配筋探査では、NDIS 3429（電磁波レーダ法）とNDIS 3430（電磁誘導法）が中心です。'
+};
+const GKEYS=Object.keys(GLOSS).sort((a,b)=>b.length-a.length);
+function wrapFirst(els,k){
+ for(const el of els){
+  const w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT,{acceptNode:n=>n.parentElement.closest('.term')?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT});
+  let n;
+  while(n=w.nextNode()){
+   const i=n.nodeValue.indexOf(k);
+   if(i<0)continue;
+   const mid=n.splitText(i);mid.splitText(k.length);
+   const sp=document.createElement('span');sp.className='term';sp.dataset.k=k;
+   mid.parentNode.replaceChild(sp,mid);sp.appendChild(mid);
+   return;
+  }
+ }
+}
+function decorate(){
+ app.querySelectorAll('.qcard[data-qi],.qcard:not([data-qi])').forEach(card=>{
+  if(card.dataset.g)return;card.dataset.g=1;
+  const els=[...card.querySelectorAll('.stem,.ch>span:last-child')];
+  GKEYS.forEach(k=>wrapFirst(els,k));
+ });
+}
+new MutationObserver(decorate).observe(app,{childList:true,subtree:true});
+document.addEventListener('click',e=>{
+ const old=document.getElementById('tip');if(old)old.remove();
+ const t=e.target.closest&&e.target.closest('.term');
+ if(!t)return;
+ e.stopPropagation();e.preventDefault();
+ const d=document.createElement('div');d.id='tip';
+ d.innerHTML=GLOSS[t.dataset.k]+'<small>（どこかをタップすると閉じます）</small>';
+ document.body.appendChild(d);
+},true);
 home();
 })();
 </script>
